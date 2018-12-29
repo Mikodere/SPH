@@ -1,0 +1,49 @@
+#version 430  
+
+layout( std140, binding=0 ) buffer Pos {
+   vec4 Positions[ ]; 
+};
+layout( std140, binding=1 ) buffer Vel {
+   vec4 Velocities[ ]; 
+};
+layout( std140, binding=2 ) buffer For {
+   vec3 Forces[ ]; 
+};
+layout( std140, binding=3 ) buffer Den {
+   float Densities[ ]; 
+};
+layout( std140, binding=4 ) buffer Pre {
+   float Pressures[ ]; 
+};
+// Tarea por hacer: definir el tamaño del grupo de trabajo local.
+layout( local_size_x = 256, local_size_y = 1, local_size_z = 1 ) in;
+
+const float PI = 3.14159f;
+
+layout( location = 0) uniform int N_PARTICLES;
+layout( location = 1) uniform float density0;
+layout( location = 2) uniform float mass;
+layout( location = 3) uniform float stiffness;
+layout( location = 4) uniform float SMOOTHING_LENGTH;
+
+void main()
+{
+	uint i = gl_GlobalInvocationID.x;
+
+	float densSum = 0.0f;
+
+	for(int j = 0; j < N_PARTICLES; j++)
+	{
+		vec3 delta = vec3(Positions[i] - Positions[j]);	
+		float r = length(delta);
+
+		if(r < SMOOTHING_LENGTH)
+		{
+			float poly6Kernel = 315.0f * pow(SMOOTHING_LENGTH * SMOOTHING_LENGTH - r * r, 3) / (64.0f * PI * pow(SMOOTHING_LENGTH, 9));
+			densSum += mass * poly6Kernel;
+		}
+	}
+
+	Densities[i] = density0;
+	Pressures[i] = max(stiffness * (densSum - density0) , 0);
+}

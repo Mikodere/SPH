@@ -1,0 +1,63 @@
+#version 430  
+
+layout( std140, binding=0 ) buffer Pos {
+   vec4 Positions[ ]; 
+};
+layout( std140, binding=1 ) buffer Vel {
+   vec4 Velocities[ ]; 
+};
+layout( std140, binding=2 ) buffer For {
+   vec3 Forces[ ]; 
+};
+layout( std140, binding=3 ) buffer Den {
+   float Densities[ ]; 
+};
+layout( std140, binding=4 ) buffer Pre {
+   float Pressures[ ]; 
+};
+// Tarea por hacer: definir el tamaño del grupo de trabajo local.
+layout( local_size_x = 256, local_size_y = 1, local_size_z = 1 ) in;
+
+const float PI = 3.14159f;
+const vec3 GRAVITY = vec3(0, -981.0, 0);
+
+layout( location = 0) uniform int N_PARTICLES;
+layout( location = 1) uniform float density0;
+layout( location = 2) uniform float mass;
+layout( location = 3) uniform float viscosity;
+layout( location = 4) uniform float SMOOTHING_LENGTH;
+layout( location = 5) uniform float surfTen;
+
+void main()
+{
+	uint i = gl_GlobalInvocationID.x;
+
+	vec3 press_force = vec3(0.0);
+	vec3 visc_force = vec3(0.0);
+
+	for(int j = 0; j < N_PARTICLES; j++)
+	{
+		if(i == j)
+			continue;
+
+		vec3 delta = vec3(Positions[i] - Positions[j]);
+		float r = length(delta);
+
+		if(r < SMOOTHING_LENGTH)
+		{
+			vec3 spikyKernel = -45.0f / (PI * pow(SMOOTHING_LENGTH, 6)) * pow(SMOOTHING_LENGTH - r, 2) * normalize(delta);
+			//press_force -= mass * spikyKernel;
+			press_force += (mass / Densities[j]) * ((Pressures[i] * Pressures[j])/2) * spikyKernel;
+
+			float viscosityKernel = 45.0f / (PI * pow(SMOOTHING_LENGTH, 6)) * (SMOOTHING_LENGTH - r);
+			visc_force += mass * vec3(Velocities[j] - Velocities[i]) / Densities[j] * viscosityKernel;
+		}
+	}
+
+	press_force *= -1;
+	visc_force *= viscosity;
+
+	vec3 extForce = Densities[i] * GRAVITY;
+
+	Forces[i] = press_force + visc_force + extForce;
+}

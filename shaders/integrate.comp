@@ -1,0 +1,66 @@
+#version 430  
+
+layout( std140, binding=0 ) buffer Pos {
+   vec4 Positions[ ]; 
+};
+layout( std140, binding=1 ) buffer Vel {
+   vec4 Velocities[ ]; 
+};
+layout( std140, binding=2 ) buffer For {
+   vec3 Forces[ ]; 
+};
+layout( std140, binding=3 ) buffer Den {
+   float Densities[ ]; 
+};
+layout( std140, binding=4 ) buffer Pre {
+   float Pressures[ ]; 
+};
+// Tarea por hacer: definir el tamaño del grupo de trabajo local.
+layout( local_size_x = 256, local_size_y = 1, local_size_z = 1 ) in;
+
+const float dt = 0.005;
+const float wallDamping = 0.3f;
+
+layout (location = 0) uniform int N_PARTICLES;
+layout (location = 1) uniform float tamCube ; // El cubo que engloba las particulas x,y,z = [-tamCube, tamCube]
+layout (location = 2) uniform float partSize;
+
+void main()
+{
+	uint i = gl_GlobalInvocationID.x;
+
+    // integrate
+    vec3 acceleration = Forces[i] / (Densities[i] + 1e-16);
+    vec3 new_velocity = Velocities[i].xyz + dt * acceleration;
+    vec3 new_position = Positions[i].xyz + dt * new_velocity;
+
+	if(new_position.x > tamCube) {
+		new_position.x = tamCube;
+		new_velocity.x *= -wallDamping;
+	}
+	else if(new_position.x < -tamCube) {
+		new_position.x = -tamCube;
+		new_velocity.x *= -wallDamping;
+	}
+	else if(new_position.y > tamCube) {
+		new_position.y = tamCube;
+		new_velocity.y *= -wallDamping;		
+	}
+	else if(new_position.y < -tamCube) {
+		new_position.y = -tamCube;
+		new_velocity.y *= -wallDamping;		
+	}
+	else if(new_position.z > tamCube) {
+		new_position.z = tamCube;
+		new_velocity.z *= -wallDamping;		
+	}
+	else if(new_position.z < -tamCube) {
+		new_position.z = -tamCube;
+		new_velocity.z *= -wallDamping;		
+	}
+
+	Positions[i].xyz = new_position;
+	Velocities[i].xyz= new_velocity;
+}
+
+
